@@ -20,6 +20,24 @@ const statusHistorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: function(doc, ret) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      }
+    },
+    toObject: {
+      virtuals: true,
+      transform: function(doc, ret) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      }
+    }
   }
 );
 
@@ -86,6 +104,24 @@ const shipmentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: function(doc, ret) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      }
+    },
+    toObject: {
+      virtuals: true,
+      transform: function(doc, ret) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      }
+    }
   }
 );
 
@@ -256,20 +292,23 @@ shipmentSchema.statics.addStatusHistory = async function (shipmentId, status, lo
 };
 
 shipmentSchema.statics.getStatusHistory = async function (shipmentId) {
-  const shipment = await this.findById(shipmentId).populate('statusHistory.createdBy', 'fullName');
+  const shipment = await this.findOne({ _id: shipmentId }).populate('statusHistory.createdBy', 'fullName');
 
   if (!shipment) {
     return [];
   }
 
-  return shipment.statusHistory.map((history) => ({
-    _id: history._id,
-    status: history.status,
-    location: history.location,
-    notes: history.notes,
-    createdAt: history.createdAt,
-    createdByName: history.createdBy?.fullName || null,
-  }));
+  return shipment.statusHistory.map((history) => {
+    const historyObj = history.toObject();
+    return {
+      id: historyObj.id,
+      status: historyObj.status,
+      location: historyObj.location,
+      notes: historyObj.notes,
+      createdAt: historyObj.createdAt,
+      createdByName: history.createdBy?.fullName || null,
+    };
+  });
 };
 
 const Shipment = mongoose.model('Shipment', shipmentSchema);

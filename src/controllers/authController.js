@@ -20,14 +20,15 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    const userObj = user.toObject();
+    const { passwordHash, ...userWithoutPassword } = userObj;
+
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
+      { id: userWithoutPassword.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    const userObj = user.toObject();
-    const { passwordHash, ...userWithoutPassword } = userObj;
     res.json({
       token,
       user: userWithoutPassword,
