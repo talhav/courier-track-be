@@ -30,23 +30,23 @@ const shipmentValidation = [
   body('shipmentType').isIn(Object.values(SHIPMENT_TYPE)).withMessage('Invalid shipment type'),
   body('pieces').isInt({ min: 1 }).withMessage('Pieces must be at least 1'),
   body('description').notEmpty().trim().withMessage('Description is required'),
-  body('fragile').optional().isBoolean().withMessage('Fragile must be a boolean'),
+  body('fragile').optional({ nullable: true }).isBoolean().withMessage('Fragile must be a boolean'),
   body('currency').isIn(Object.values(CURRENCY_TYPE)).withMessage('Invalid currency type'),
-  body('shipperReference').optional().trim(),
-  body('comments').optional().trim(),
-  body('totalVolumetricWeight').optional().isFloat({ min: 0 }).withMessage('Total volumetric weight must be positive'),
-  body('dimensions').optional().trim(),
-  body('weight').optional().isFloat({ min: 0 }).withMessage('Weight must be positive'),
-  body('invoiceType').optional().isIn(Object.values(INVOICE_TYPE)).withMessage('Invalid invoice type'),
+  body('shipperReference').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('comments').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('totalVolumetricWeight').optional({ nullable: true, checkFalsy: true }).isFloat({ min: 0 }).withMessage('Total volumetric weight must be positive'),
+  body('dimensions').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('weight').optional({ nullable: true, checkFalsy: true }).isFloat({ min: 0 }).withMessage('Weight must be positive'),
+  body('invoiceType').optional({ nullable: true, checkFalsy: true }).isIn(Object.values(INVOICE_TYPE)).withMessage('Invalid invoice type'),
   validate,
 ];
 
 const userValidation = [
   body('email').isEmail().withMessage('Valid email is required'),
   body('fullName').notEmpty().trim().withMessage('Full name is required'),
-  body('phone').optional().trim(),
+  body('phone').optional({ nullable: true, checkFalsy: true }).trim(),
   body('role').isIn(Object.values(USER_ROLES)).withMessage('Invalid role'),
-  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').optional({ nullable: true, checkFalsy: true }).isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   validate,
 ];
 

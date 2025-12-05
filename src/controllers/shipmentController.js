@@ -90,7 +90,7 @@ const duplicateShipment = async (req, res, next) => {
     }
 
     const shipmentObj = existingShipment.toObject();
-    const { _id, consigneeNumber, createdAt, updatedAt, statusHistory, ...shipmentData } = shipmentObj;
+    const { id: shipmentId, consigneeNumber, createdAt, updatedAt, statusHistory, ...shipmentData } = shipmentObj;
 
     const duplicatedData = {
       ...shipmentData,
@@ -113,7 +113,7 @@ const trackShipment = async (req, res, next) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    const statusHistory = await Shipment.getStatusHistory(shipment._id);
+    const statusHistory = await Shipment.getStatusHistory(shipment.id);
 
     res.json({
       shipment,
