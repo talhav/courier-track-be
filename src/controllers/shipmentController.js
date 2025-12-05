@@ -1,5 +1,4 @@
 const Shipment = require('../models/Shipment');
-const { toCamelCase, toSnakeCase } = require('../utils/helpers');
 
 const getAllShipments = async (req, res, next) => {
   try {
@@ -15,7 +14,7 @@ const getAllShipments = async (req, res, next) => {
 
     const result = await Shipment.findAll(filters);
     res.json({
-      data: toCamelCase(result.data),
+      data: result.data,
       pagination: result.pagination,
     });
   } catch (error) {
@@ -32,7 +31,7 @@ const getShipmentById = async (req, res, next) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    res.json(toCamelCase(shipment));
+    res.json(shipment);
   } catch (error) {
     next(error);
   }
@@ -40,9 +39,9 @@ const getShipmentById = async (req, res, next) => {
 
 const createShipment = async (req, res, next) => {
   try {
-    const shipmentData = toSnakeCase(req.body);
+    const shipmentData = req.body;
     const shipment = await Shipment.create(shipmentData, req.user.id);
-    res.status(201).json(toCamelCase(shipment));
+    res.status(201).json(shipment);
   } catch (error) {
     next(error);
   }
@@ -51,7 +50,7 @@ const createShipment = async (req, res, next) => {
 const updateShipment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const shipmentData = toSnakeCase(req.body);
+    const shipmentData = req.body;
 
     const existingShipment = await Shipment.findById(id);
     if (!existingShipment) {
@@ -59,7 +58,7 @@ const updateShipment = async (req, res, next) => {
     }
 
     const shipment = await Shipment.update(id, shipmentData, req.user.id);
-    res.json(toCamelCase(shipment));
+    res.json(shipment);
   } catch (error) {
     next(error);
   }
@@ -90,15 +89,16 @@ const duplicateShipment = async (req, res, next) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    const { id: _, consignee_number, created_at, updated_at, ...shipmentData } = existingShipment;
+    const shipmentObj = existingShipment.toObject();
+    const { _id, consigneeNumber, createdAt, updatedAt, statusHistory, ...shipmentData } = shipmentObj;
 
     const duplicatedData = {
       ...shipmentData,
       invoiceType,
     };
 
-    const newShipment = await Shipment.create(toCamelCase(duplicatedData), req.user.id);
-    res.status(201).json(toCamelCase(newShipment));
+    const newShipment = await Shipment.create(duplicatedData, req.user.id);
+    res.status(201).json(newShipment);
   } catch (error) {
     next(error);
   }
@@ -113,11 +113,11 @@ const trackShipment = async (req, res, next) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    const statusHistory = await Shipment.getStatusHistory(shipment.id);
+    const statusHistory = await Shipment.getStatusHistory(shipment._id);
 
     res.json({
-      shipment: toCamelCase(shipment),
-      statusHistory: toCamelCase(statusHistory),
+      shipment,
+      statusHistory,
     });
   } catch (error) {
     next(error);
@@ -128,7 +128,7 @@ const getStatusHistory = async (req, res, next) => {
   try {
     const { id } = req.params;
     const statusHistory = await Shipment.getStatusHistory(id);
-    res.json(toCamelCase(statusHistory));
+    res.json(statusHistory);
   } catch (error) {
     next(error);
   }
@@ -156,7 +156,7 @@ const addStatusUpdate = async (req, res, next) => {
       req.user.id
     );
 
-    res.status(201).json(toCamelCase(statusUpdate));
+    res.status(201).json(statusUpdate);
   } catch (error) {
     next(error);
   }

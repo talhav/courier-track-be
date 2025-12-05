@@ -1,10 +1,9 @@
 const User = require('../models/User');
-const { toCamelCase, toSnakeCase } = require('../utils/helpers');
 
 const getAllUsers = async (req, res, next) => {
   try {
     const users = await User.findAll();
-    res.json(toCamelCase(users));
+    res.json(users);
   } catch (error) {
     next(error);
   }
@@ -19,7 +18,7 @@ const getUserById = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(toCamelCase(user));
+    res.json(user);
   } catch (error) {
     next(error);
   }
@@ -27,7 +26,7 @@ const getUserById = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
   try {
-    const userData = toSnakeCase(req.body);
+    const userData = req.body;
 
     const existingUser = await User.findByEmail(userData.email);
     if (existingUser) {
@@ -35,7 +34,7 @@ const createUser = async (req, res, next) => {
     }
 
     const user = await User.create(userData);
-    res.status(201).json(toCamelCase(user));
+    res.status(201).json(user);
   } catch (error) {
     next(error);
   }
@@ -44,7 +43,7 @@ const createUser = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userData = toSnakeCase(req.body);
+    const userData = req.body;
 
     const existingUser = await User.findById(id);
     if (!existingUser) {
@@ -59,7 +58,7 @@ const updateUser = async (req, res, next) => {
     }
 
     const user = await User.update(id, userData);
-    res.json(toCamelCase(user));
+    res.json(user);
   } catch (error) {
     next(error);
   }

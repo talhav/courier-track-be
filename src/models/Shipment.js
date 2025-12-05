@@ -1,221 +1,277 @@
-const pool = require('../config/database');
+const mongoose = require('mongoose');
 const { generateConsigneeNumber } = require('../utils/helpers');
 
-class Shipment {
-  static async findAll(filters = {}) {
-    const {
-      startDate,
-      endDate,
-      destination,
-      service,
-      status,
-      page = 1,
-      limit = 10,
-    } = filters;
+const statusHistorySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      required: true,
+    },
+    location: {
+      type: String,
+    },
+    notes: {
+      type: String,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-    const offset = (page - 1) * limit;
-    const conditions = [];
-    const params = [];
-    let paramCount = 1;
+const shipmentSchema = new mongoose.Schema(
+  {
+    consigneeNumber: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    service: {
+      type: String,
+      required: true,
+    },
+    status: {
+      type: String,
+      default: 'pending',
+    },
+    companyName: String,
 
-    if (startDate) {
-      conditions.push(`created_at >= $${paramCount++}`);
-      params.push(startDate);
-    }
+    // Shipper information
+    shipperName: String,
+    shipperPhone: String,
+    shipperAddress: String,
+    shipperCountry: String,
+    shipperCity: String,
+    shipperPostal: String,
 
-    if (endDate) {
-      conditions.push(`created_at <= $${paramCount++}`);
-      params.push(endDate);
-    }
+    // Receiver information
+    consigneeCompanyName: String,
+    receiverName: String,
+    receiverEmail: String,
+    receiverPhone: String,
+    receiverAddress: String,
+    receiverCountry: String,
+    receiverCity: String,
+    receiverZip: String,
 
-    if (destination) {
-      conditions.push(`receiver_country ILIKE $${paramCount++}`);
-      params.push(`%${destination}%`);
-    }
+    // Shipment details
+    accountNo: String,
+    shipmentType: String,
+    pieces: Number,
+    description: String,
+    fragile: {
+      type: Boolean,
+      default: false,
+    },
+    currency: String,
+    shipperReference: String,
+    comments: String,
+    totalVolumetricWeight: Number,
+    dimensions: String,
+    weight: Number,
+    invoiceType: String,
 
-    if (service) {
-      conditions.push(`service = $${paramCount++}`);
-      params.push(service);
-    }
+    // Status history
+    statusHistory: [statusHistorySchema],
 
-    if (status) {
-      conditions.push(`status = $${paramCount++}`);
-      params.push(status);
-    }
+    // Created by
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+// Static methods
+shipmentSchema.statics.findAll = async function (filters = {}) {
+  const {
+    startDate,
+    endDate,
+    destination,
+    service,
+    status,
+    page = 1,
+    limit = 10,
+  } = filters;
 
-    // Count query
-    const countQuery = `SELECT COUNT(*) FROM shipments ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].count);
+  const query = {};
 
-    // Data query
-    const dataQuery = `
-      SELECT *
-      FROM shipments
-      ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT $${paramCount++} OFFSET $${paramCount++}
-    `;
-    const result = await pool.query(dataQuery, [...params, limit, offset]);
+  if (startDate) {
+    query.createdAt = { ...query.createdAt, $gte: new Date(startDate) };
+  }
 
-    return {
-      data: result.rows,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit),
+  if (endDate) {
+    query.createdAt = { ...query.createdAt, $lte: new Date(endDate) };
+  }
+
+  if (destination) {
+    query.receiverCountry = { $regex: destination, $options: 'i' };
+  }
+
+  if (service) {
+    query.service = service;
+  }
+
+  if (status) {
+    query.status = status;
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [data, total] = await Promise.all([
+    this.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit)),
+    this.countDocuments(query),
+  ]);
+
+  return {
+    data,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+shipmentSchema.statics.findById = async function (id) {
+  return await this.findOne({ _id: id });
+};
+
+shipmentSchema.statics.findByConsigneeNumber = async function (consigneeNumber) {
+  return await this.findOne({ consigneeNumber });
+};
+
+shipmentSchema.statics.create = async function (shipmentData, userId) {
+  const consigneeNumber = generateConsigneeNumber();
+
+  const shipment = new this({
+    consigneeNumber,
+    service: shipmentData.service,
+    status: 'pending',
+    companyName: shipmentData.companyName,
+    shipperName: shipmentData.shipperName,
+    shipperPhone: shipmentData.shipperPhone,
+    shipperAddress: shipmentData.shipperAddress,
+    shipperCountry: shipmentData.shipperCountry,
+    shipperCity: shipmentData.shipperCity,
+    shipperPostal: shipmentData.shipperPostal,
+    consigneeCompanyName: shipmentData.consigneeCompanyName,
+    receiverName: shipmentData.receiverName,
+    receiverEmail: shipmentData.receiverEmail,
+    receiverPhone: shipmentData.receiverPhone,
+    receiverAddress: shipmentData.receiverAddress,
+    receiverCountry: shipmentData.receiverCountry,
+    receiverCity: shipmentData.receiverCity,
+    receiverZip: shipmentData.receiverZip,
+    accountNo: shipmentData.accountNo,
+    shipmentType: shipmentData.shipmentType,
+    pieces: shipmentData.pieces,
+    description: shipmentData.description,
+    fragile: shipmentData.fragile || false,
+    currency: shipmentData.currency,
+    shipperReference: shipmentData.shipperReference || null,
+    comments: shipmentData.comments || null,
+    totalVolumetricWeight: shipmentData.totalVolumetricWeight || null,
+    dimensions: shipmentData.dimensions || null,
+    weight: shipmentData.weight || null,
+    invoiceType: shipmentData.invoiceType || null,
+    createdBy: userId,
+    statusHistory: [
+      {
+        status: 'pending',
+        notes: 'Shipment created',
+        createdBy: userId,
       },
-    };
-  }
+    ],
+  });
 
-  static async findById(id) {
-    const query = `SELECT * FROM shipments WHERE id = $1`;
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
-  }
+  await shipment.save();
+  return shipment;
+};
 
-  static async findByConsigneeNumber(consigneeNumber) {
-    const query = `SELECT * FROM shipments WHERE consignee_number = $1`;
-    const result = await pool.query(query, [consigneeNumber]);
-    return result.rows[0];
-  }
+shipmentSchema.statics.update = async function (id, shipmentData, userId) {
+  const updateData = {};
 
-  static async create(shipmentData, userId) {
-    const consigneeNumber = generateConsigneeNumber();
+  const updateableFields = [
+    'service', 'status', 'companyName', 'shipperName', 'shipperPhone', 'shipperAddress',
+    'shipperCountry', 'shipperCity', 'shipperPostal', 'consigneeCompanyName', 'receiverName',
+    'receiverEmail', 'receiverPhone', 'receiverAddress', 'receiverCountry', 'receiverCity',
+    'receiverZip', 'accountNo', 'shipmentType', 'pieces', 'description', 'fragile',
+    'currency', 'shipperReference', 'comments', 'totalVolumetricWeight', 'dimensions',
+    'weight', 'invoiceType',
+  ];
 
-    const query = `
-      INSERT INTO shipments (
-        consignee_number, service, status, company_name,
-        shipper_name, shipper_phone, shipper_address, shipper_country, shipper_city, shipper_postal,
-        consignee_company_name, receiver_name, receiver_email, receiver_phone, receiver_address,
-        receiver_country, receiver_city, receiver_zip,
-        account_no, shipment_type, pieces, description, fragile, currency,
-        shipper_reference, comments, total_volumetric_weight, dimensions, weight, invoice_type,
-        created_by
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17, $18,
-        $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
-      )
-      RETURNING *
-    `;
-
-    const values = [
-      consigneeNumber,
-      shipmentData.service,
-      'pending',
-      shipmentData.companyName,
-      shipmentData.shipperName,
-      shipmentData.shipperPhone,
-      shipmentData.shipperAddress,
-      shipmentData.shipperCountry,
-      shipmentData.shipperCity,
-      shipmentData.shipperPostal,
-      shipmentData.consigneeCompanyName,
-      shipmentData.receiverName,
-      shipmentData.receiverEmail,
-      shipmentData.receiverPhone,
-      shipmentData.receiverAddress,
-      shipmentData.receiverCountry,
-      shipmentData.receiverCity,
-      shipmentData.receiverZip,
-      shipmentData.accountNo,
-      shipmentData.shipmentType,
-      shipmentData.pieces,
-      shipmentData.description,
-      shipmentData.fragile || false,
-      shipmentData.currency,
-      shipmentData.shipperReference || null,
-      shipmentData.comments || null,
-      shipmentData.totalVolumetricWeight || null,
-      shipmentData.dimensions || null,
-      shipmentData.weight || null,
-      shipmentData.invoiceType || null,
-      userId,
-    ];
-
-    const result = await pool.query(query, values);
-
-    // Create initial status history
-    await this.addStatusHistory(result.rows[0].id, 'pending', null, 'Shipment created', userId);
-
-    return result.rows[0];
-  }
-
-  static async update(id, shipmentData, userId) {
-    const fields = [];
-    const values = [];
-    let paramCount = 1;
-
-    const updateableFields = [
-      'service', 'status', 'companyName', 'shipperName', 'shipperPhone', 'shipperAddress',
-      'shipperCountry', 'shipperCity', 'shipperPostal', 'consigneeCompanyName', 'receiverName',
-      'receiverEmail', 'receiverPhone', 'receiverAddress', 'receiverCountry', 'receiverCity',
-      'receiverZip', 'accountNo', 'shipmentType', 'pieces', 'description', 'fragile',
-      'currency', 'shipperReference', 'comments', 'totalVolumetricWeight', 'dimensions',
-      'weight', 'invoiceType',
-    ];
-
-    for (const field of updateableFields) {
-      if (shipmentData[field] !== undefined) {
-        const snakeField = field.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        fields.push(`${snakeField} = $${paramCount++}`);
-        values.push(shipmentData[field]);
-      }
+  for (const field of updateableFields) {
+    if (shipmentData[field] !== undefined) {
+      updateData[field] = shipmentData[field];
     }
-
-    if (fields.length === 0) {
-      throw new Error('No fields to update');
-    }
-
-    values.push(id);
-    const query = `
-      UPDATE shipments
-      SET ${fields.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await pool.query(query, values);
-
-    // Add status history if status changed
-    if (shipmentData.status) {
-      await this.addStatusHistory(id, shipmentData.status, null, 'Status updated', userId);
-    }
-
-    return result.rows[0];
   }
 
-  static async delete(id) {
-    const query = `DELETE FROM shipments WHERE id = $1`;
-    const result = await pool.query(query, [id]);
-    return result.rowCount > 0;
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('No fields to update');
   }
 
-  static async addStatusHistory(shipmentId, status, location, notes, userId) {
-    const query = `
-      INSERT INTO shipment_status_history (shipment_id, status, location, notes, created_by)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `;
-    const result = await pool.query(query, [shipmentId, status, location, notes, userId]);
-    return result.rows[0];
+  const shipment = await this.findByIdAndUpdate(id, updateData, { new: true });
+
+  // Add status history if status changed
+  if (shipmentData.status) {
+    await this.addStatusHistory(id, shipmentData.status, null, 'Status updated', userId);
   }
 
-  static async getStatusHistory(shipmentId) {
-    const query = `
-      SELECT ssh.*, u.full_name as created_by_name
-      FROM shipment_status_history ssh
-      LEFT JOIN users u ON ssh.created_by = u.id
-      WHERE ssh.shipment_id = $1
-      ORDER BY ssh.created_at DESC
-    `;
-    const result = await pool.query(query, [shipmentId]);
-    return result.rows;
+  return shipment;
+};
+
+shipmentSchema.statics.delete = async function (id) {
+  const result = await this.findByIdAndDelete(id);
+  return result !== null;
+};
+
+shipmentSchema.statics.addStatusHistory = async function (shipmentId, status, location, notes, userId) {
+  const shipment = await this.findById(shipmentId);
+
+  if (!shipment) {
+    throw new Error('Shipment not found');
   }
-}
+
+  shipment.statusHistory.push({
+    status,
+    location,
+    notes,
+    createdBy: userId,
+  });
+
+  await shipment.save();
+  return shipment.statusHistory[shipment.statusHistory.length - 1];
+};
+
+shipmentSchema.statics.getStatusHistory = async function (shipmentId) {
+  const shipment = await this.findById(shipmentId).populate('statusHistory.createdBy', 'fullName');
+
+  if (!shipment) {
+    return [];
+  }
+
+  return shipment.statusHistory.map((history) => ({
+    _id: history._id,
+    status: history.status,
+    location: history.location,
+    notes: history.notes,
+    createdAt: history.createdAt,
+    createdByName: history.createdBy?.fullName || null,
+  }));
+};
+
+const Shipment = mongoose.model('Shipment', shipmentSchema);
 
 module.exports = Shipment;

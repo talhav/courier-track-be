@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
-const pool = require('./config/database');
+const connectDB = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,11 +34,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Test database connection and start server
+// Connect to database and start server
 const startServer = async () => {
   try {
-    // Test database connection
-    await pool.query('SELECT NOW()');
+    // Connect to MongoDB
+    await connectDB();
     console.log('✓ Database connection verified');
 
     app.listen(PORT, () => {
@@ -56,9 +56,10 @@ const startServer = async () => {
 startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  pool.end(() => {
-    console.log('Database pool closed');
-  });
+  const mongoose = require('mongoose');
+  await mongoose.connection.close();
+  console.log('Database connection closed');
+  process.exit(0);
 });
