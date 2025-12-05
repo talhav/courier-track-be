@@ -11,25 +11,26 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    if (!user.is_active) {
+    if (!user.isActive) {
       return res.status(403).json({ error: 'Account is inactive' });
     }
 
-    const isValidPassword = await User.verifyPassword(password, user.password_hash);
+    const isValidPassword = await User.verifyPassword(password, user.passwordHash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    const { password_hash, ...userWithoutPassword } = user;
+    const userObj = user.toObject();
+    const { passwordHash, ...userWithoutPassword } = userObj;
     res.json({
       token,
-      user: toCamelCase(userWithoutPassword),
+      user: userWithoutPassword,
     });
   } catch (error) {
     next(error);
@@ -42,7 +43,7 @@ const getProfile = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.json(toCamelCase(user));
+    res.json(user);
   } catch (error) {
     next(error);
   }
