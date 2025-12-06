@@ -9,6 +9,7 @@ const {
   trackShipment,
   getStatusHistory,
   addStatusUpdate,
+  downloadInvoice,
 } = require('../controllers/shipmentController');
 const { shipmentValidation } = require('../middleware/validator');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
@@ -23,6 +24,7 @@ router.get('/', getAllShipments);
 router.get('/track/:consigneeNumber', trackShipment);
 router.get('/:id', getShipmentById);
 router.get('/:id/status-history', getStatusHistory);
+router.get('/:id/download-invoice', downloadInvoice);
 router.post('/', authorizeRoles(USER_ROLES.ADMIN, USER_ROLES.OPERATOR), shipmentValidation, createShipment);
 router.put('/:id', authorizeRoles(USER_ROLES.ADMIN, USER_ROLES.OPERATOR), updateShipment);
 router.delete('/:id', authorizeRoles(USER_ROLES.ADMIN), deleteShipment);

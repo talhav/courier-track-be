@@ -1,4 +1,5 @@
 const Shipment = require('../models/Shipment');
+const { generateInvoicePDF } = require('../utils/pdfGenerator');
 
 const getAllShipments = async (req, res, next) => {
   try {
@@ -162,6 +163,32 @@ const addStatusUpdate = async (req, res, next) => {
   }
 };
 
+const downloadInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const shipment = await Shipment.findById(id);
+
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Generate PDF
+    const pdfDoc = generateInvoicePDF(shipment);
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=invoice-${shipment.consigneeNumber}.pdf`
+    );
+
+    // Pipe the PDF to the response
+    pdfDoc.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllShipments,
   getShipmentById,
@@ -172,4 +199,5 @@ module.exports = {
   trackShipment,
   getStatusHistory,
   addStatusUpdate,
+  downloadInvoice,
 };
